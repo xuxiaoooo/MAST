@@ -1,46 +1,19 @@
-import pickle
-import matplotlib.pyplot as plt
-import numpy as np
+import scipy.io
+import pandas as pd
 
-crowd = 'BD-MDD'
-file_paths = [
-    f"/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_alpha_{crowd}.pkl",
-    f"/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_beta_{crowd}.pkl",
-    f"/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_delta_{crowd}.pkl",
-    f"/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_theta_{crowd}.pkl",
-    f"/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_whole_band_{crowd}.pkl"
-]
+# 加载 .mat 文件
+mat = scipy.io.loadmat('/Users/xuxiao/WorkBench/AMA_EEG/data/features/PSDdata/IPS_3_PSD.mat')
+data_list = mat['None']
 
-roc_curves = []
-for file_path in file_paths:
-    with open(file_path, "rb") as f:
-        roc_curves.append(pickle.load(f))
+# 在列表中遍历每个元组
+for data_tuple in data_list:
+    # 如果元组的第三个元素（索引为2）是 'table'
+    if data_tuple[2] == b'table':
+        # 打印出元组的第四个元素（索引为3），这应该是实际的数据
+        print(data_tuple[3])
 
-labels = [
-    "alpha",
-    "beta",
-    "delta",
-    "theta",
-    "whole band",
-]
+# # 将 numpy 数组转换为 pandas DataFrame
+# df = pd.DataFrame(data)
 
-# 设置字体
-font = {'family': 'Arial',
-        'weight': 'normal',
-        'size': 18,
-        }
-plt.rc('font', **font)
-
-# 画ROC曲线
-plt.figure(figsize=(8, 7))
-plt.plot([0, 1], [0, 1], color='gray', lw=2, linestyle='--')  # 45度线
-for i, (fpr, tpr) in enumerate(roc_curves):
-    plt.plot(fpr, tpr, lw=2, linestyle='--', label=labels[i])
-
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.xlabel('False Positive Rate', fontsize=16, fontname="Arial")
-plt.ylabel('True Positive Rate', fontsize=16, fontname="Arial")
-plt.title('Receiver Operating Characteristic Curves', fontsize=20)
-plt.legend(loc="lower right", prop={'family':'Arial', 'size':16})
-plt.savefig(f'/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_curves_{crowd}.jpg', dpi=300, bbox_inches='tight')
+# # 将 DataFrame 保存为 excel 文件
+# df.to_excel('/Users/xuxiao/WorkBench/AMA_EEG/data/features/PSDdata/IPS_3_PSD.xlsx', index=False)
