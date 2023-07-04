@@ -2,12 +2,13 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 
+crowd = 'BD-MDD'
 file_paths = [
-    "/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_alpha_BD-MDD.pkl",
-    "/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_beta_BD-MDD.pkl",
-    "/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_delta_BD-MDD.pkl",
-    "/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_theta_BD-MDD.pkl",
-    "/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_whole_band_BD-MDD.pkl"
+    f"/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_alpha_{crowd}.pkl",
+    f"/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_beta_{crowd}.pkl",
+    f"/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_delta_{crowd}.pkl",
+    f"/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_theta_{crowd}.pkl",
+    f"/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_whole_band_{crowd}.pkl"
 ]
 
 roc_curves = []
@@ -42,4 +43,4 @@ plt.xlabel('False Positive Rate', fontsize=16, fontname="Arial")
 plt.ylabel('True Positive Rate', fontsize=16, fontname="Arial")
 plt.title('Receiver Operating Characteristic Curves', fontsize=20)
 plt.legend(loc="lower right", prop={'family':'Arial', 'size':16})
-plt.show()
+plt.savefig(f'/Users/xuxiao/WorkBench/AMA_EEG/code/draw/roc_curves_{crowd}.jpg', dpi=300, bbox_inches='tight')
