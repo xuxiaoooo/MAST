@@ -1,2 +1,1 @@
-# AMA_EEG
-Adolescent Mental health Analysis based on EEG
+Multiple Attention-based Time Series fusion model (MAST), designed for EEG
