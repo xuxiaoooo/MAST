@@ -63,9 +63,9 @@ class Channel(nn.Module):
         x = self.bilstm_module(x)
         return x
     
-class MultiHeadAttentionModule(nn.Module):
+class TransformerModule(nn.Module):
     def __init__(self, num_heads, input_dim, hidden_dim, dropout_rate=0.1):
-        super(MultiHeadAttentionModule, self).__init__()
+        super(TransformerModule, self).__init__()
         self.attention = nn.MultiheadAttention(embed_dim=input_dim, num_heads=num_heads)
         self.norm1 = nn.LayerNorm(input_dim)
         self.ff = nn.Sequential(
@@ -86,14 +86,14 @@ class MultiHeadAttentionModule(nn.Module):
         return output
 
 class MAST(nn.Module):
-    def __init__(self, input_dim=2000, hidden_dim=2048, dropout_rate=0.15):
+    def __init__(self, input_dim=2000, hidden_dim1=2048, hidden_dim2=2048, hidden_dim3=2048, dropout_rate=0.15):
         super(MAST, self).__init__()
         ff_hidden_dim1 = 1024
-        self.channel = Channel(input_dim=input_dim, hidden_dim=hidden_dim)
-        self.multihead_attention1 = MultiHeadAttentionModule(num_heads=16, input_dim=hidden_dim, hidden_dim=ff_hidden_dim1, dropout_rate=dropout_rate)
-        self.multihead_attention2 = MultiHeadAttentionModule(num_heads=8, input_dim=hidden_dim, hidden_dim=hidden_dim, dropout_rate=dropout_rate)
+        self.channel = Channel(input_dim=input_dim, hidden_dim1=hidden_dim1)
+        self.multihead_attention1 = TransformerModule(num_heads=16, input_dim=hidden_dim1, hidden_dim=ff_hidden_dim1, dropout_rate=dropout_rate)
+        self.multihead_attention2 = TransformerModule(num_heads=8, input_dim=hidden_dim2, hidden_dim=hidden_dim3, dropout_rate=dropout_rate)
         self.dropout = nn.Dropout(dropout_rate)
-        self.fc1 = nn.Linear(hidden_dim, 1)
+        self.fc1 = nn.Linear(hidden_dim3, 1)
 
     def forward(self, x):
         outputs1 = []
