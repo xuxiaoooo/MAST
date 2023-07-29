@@ -64,31 +64,38 @@ class Channel(nn.Module):
         return x
     
 class MultiHeadAttentionModule(nn.Module):
-    def __init__(self, num_heads, input_dim, output_dim):
+    def __init__(self, num_heads, input_dim, hidden_dim, dropout_rate=0.1):
         super(MultiHeadAttentionModule, self).__init__()
         self.attention = nn.MultiheadAttention(embed_dim=input_dim, num_heads=num_heads)
-        self.fc = nn.Linear(input_dim, output_dim)
-        
+        self.norm1 = nn.LayerNorm(input_dim)
+        self.ff = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, input_dim),
+        )
+        self.norm2 = nn.LayerNorm(input_dim)
+        self.dropout = nn.Dropout(dropout_rate)
+
     def forward(self, x):
         attn_output, _ = self.attention(x, x, x)
-        attn_output = attn_output[-1]
-        output = self.fc(attn_output)
+        x = self.norm1(x + self.dropout(attn_output))
+
+        ff_output = self.ff(x)
+        output = self.norm2(x + self.dropout(ff_output))
+
         return output
 
 class MAST(nn.Module):
-    def __init__(self, input_dim=2000, hidden_dim1=2048, hidden_dim2=1008, hidden_dim3=512, dropout_rate=0.5):
+    def __init__(self, input_dim=2000, hidden_dim=2048, dropout_rate=0.15):
         super(MAST, self).__init__()
-        assert hidden_dim1 % 16 == 0, "hidden_dim1 must be divisible by 16"
-        assert hidden_dim2 % 24 == 0, "hidden_dim2 must be divisible by 24"
-        self.channel = Channel(input_dim=input_dim, hidden_dim1=hidden_dim1)
-        self.multihead_attention1 = MultiHeadAttentionModule(num_heads=16, input_dim=hidden_dim1, output_dim=hidden_dim2)
-        self.multihead_attention2 = MultiHeadAttentionModule(num_heads=24, input_dim=hidden_dim2, output_dim=hidden_dim3)
+        ff_hidden_dim1 = 1024
+        self.channel = Channel(input_dim=input_dim, hidden_dim=hidden_dim)
+        self.multihead_attention1 = MultiHeadAttentionModule(num_heads=16, input_dim=hidden_dim, hidden_dim=ff_hidden_dim1, dropout_rate=dropout_rate)
+        self.multihead_attention2 = MultiHeadAttentionModule(num_heads=8, input_dim=hidden_dim, hidden_dim=hidden_dim, dropout_rate=dropout_rate)
         self.dropout = nn.Dropout(dropout_rate)
-        self.fc1 = nn.Linear(hidden_dim3, 1)
+        self.fc1 = nn.Linear(hidden_dim, 1)
 
     def forward(self, x):
-        batch_size = x.size(0)
-        print(x.size())
         outputs1 = []
         for i in range(24):
             temp = [self.channel(x[:, i, j, :]) for j in range(16)]
@@ -99,8 +106,8 @@ class MAST(nn.Module):
         outputs1 = torch.stack(outputs1, dim=1)
         outputs1 = outputs1.transpose(0, 1)
         outputs2 = self.multihead_attention2(outputs1)
-
         outputs2 = self.dropout(outputs2)
-        outputs2 = self.fc1(outputs2)
+        outputs2 = torch.mean(outputs2, dim=0)
+        outputs2 = self.fc1(outputs2).squeeze(-1)
 
         return outputs2
