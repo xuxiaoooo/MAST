@@ -1,126 +1,106 @@
 import torch
 import torch.nn as nn
 
-class MultiheadAttention(nn.Module):
-    def __init__(self, d_model, num_heads):
-        super().__init__()
-        self.num_heads = num_heads
-        self.d_model = d_model
-        self.depth = d_model // num_heads
+class ALL_MLP(nn.Module):
+    def __init__(self, input_dim=2048, hidden_dim1=1024, hidden_dim2=512):
+        super(ALL_MLP, self).__init__()
+        self.mlp1 = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim1),
+            nn.LayerNorm(hidden_dim1),
+            nn.ReLU()
+        )
+        self.mlp2 = nn.Sequential(
+            nn.Linear(hidden_dim1, hidden_dim2),
+            nn.LayerNorm(hidden_dim2),
+            nn.ReLU()
+        )
+        self.mlp3 = nn.Sequential(
+            nn.Linear(hidden_dim2, hidden_dim1),
+            nn.LayerNorm(hidden_dim1),
+            nn.ReLU()
+        )
+        self.mlp4 = nn.Sequential(
+            nn.Linear(hidden_dim1, input_dim),
+            nn.LayerNorm(input_dim),
+            nn.ReLU()
+        )
 
-        self.wq = nn.Linear(d_model, d_model, bias=False)
-        self.wk = nn.Linear(d_model, d_model, bias=False)
-        self.wv = nn.Linear(d_model, d_model, bias=False)
+    def forward(self, x):
+        x = self.mlp1(x)
+        x = self.mlp2(x)
+        x = self.mlp3(x)
+        x = self.mlp4(x)
+        return x
 
-        self.fc = nn.Linear(d_model, d_model, bias=False)
+class BiLSTM(nn.Module):
+    def __init__(self, input_dim=2048, hidden_dim=1024, dropout_rate=0.2):
+        super(BiLSTM, self).__init__()
+        self.bilstm = nn.LSTM(input_size=input_dim, hidden_size=hidden_dim, num_layers=3, bidirectional=True, batch_first=True)
+        self.fc1 = nn.Linear(2 * hidden_dim, hidden_dim)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc2 = nn.Linear(hidden_dim, input_dim)
 
-    def split_heads(self, x, batch_size):
-        x = x.view(batch_size, -1, self.num_heads, self.depth)
-        return x.transpose(2, 1)
+    def forward(self, x):
+        x = x.unsqueeze(1)
+        x, _ = self.bilstm(x)
+        x = x.squeeze(1)
+        x = self.fc1(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
+    
+class Channel(nn.Module):
+    def __init__(self, input_dim=2000, hidden_dim1=2048, hidden_dim2=1024, N=3, dropout_rate=0.5):
+        super(Channel, self).__init__()
+        self.fc_input = nn.Linear(input_dim, hidden_dim1)
+        self.all_mlp_modules = nn.ModuleList([ALL_MLP(input_dim=hidden_dim1, hidden_dim1=hidden_dim2) for _ in range(N)])
+        self.bilstm_module = BiLSTM(input_dim=hidden_dim1, hidden_dim=hidden_dim2, dropout_rate=dropout_rate)
+
+    def forward(self, x):
+        x = self.fc_input(x)
+        for mlp in self.all_mlp_modules:
+            x = mlp(x)
+        x = self.bilstm_module(x)
+        return x
+    
+class MultiHeadAttentionModule(nn.Module):
+    def __init__(self, num_heads, input_dim, output_dim):
+        super(MultiHeadAttentionModule, self).__init__()
+        self.attention = nn.MultiheadAttention(embed_dim=input_dim, num_heads=num_heads)
+        self.fc = nn.Linear(input_dim, output_dim)
+        
+    def forward(self, x):
+        attn_output, _ = self.attention(x, x, x)
+        attn_output = attn_output[-1]
+        output = self.fc(attn_output)
+        return output
+
+class MAST(nn.Module):
+    def __init__(self, input_dim=2000, hidden_dim1=2048, hidden_dim2=1008, hidden_dim3=512, dropout_rate=0.5):
+        super(MAST, self).__init__()
+        assert hidden_dim1 % 16 == 0, "hidden_dim1 must be divisible by 16"
+        assert hidden_dim2 % 24 == 0, "hidden_dim2 must be divisible by 24"
+        self.channel = Channel(input_dim=input_dim, hidden_dim1=hidden_dim1)
+        self.multihead_attention1 = MultiHeadAttentionModule(num_heads=16, input_dim=hidden_dim1, output_dim=hidden_dim2)
+        self.multihead_attention2 = MultiHeadAttentionModule(num_heads=24, input_dim=hidden_dim2, output_dim=hidden_dim3)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc1 = nn.Linear(hidden_dim3, 1)
 
     def forward(self, x):
         batch_size = x.size(0)
+        print(x.size())
+        outputs1 = []
+        for i in range(24):
+            temp = [self.channel(x[:, i, j, :]) for j in range(16)]
+            temp = torch.stack(temp, dim=1)
+            temp = temp.transpose(0, 1)
+            outputs1.append(self.multihead_attention1(temp)[-1])
 
-        query = self.wq(x)
-        key = self.wk(x)
-        value = self.wv(x)
+        outputs1 = torch.stack(outputs1, dim=1)
+        outputs1 = outputs1.transpose(0, 1)
+        outputs2 = self.multihead_attention2(outputs1)
 
-        query = self.split_heads(query, batch_size)
-        key = self.split_heads(key, batch_size)
-        value = self.split_heads(value, batch_size)
+        outputs2 = self.dropout(outputs2)
+        outputs2 = self.fc1(outputs2)
 
-        attn_weights = torch.matmul(query, key.transpose(-2, -1))
-        attn_weights = attn_weights / math.sqrt(self.depth)
-        attn_weights = torch.softmax(attn_weights, dim=-1)
-
-        output = torch.matmul(attn_weights, value)
-        output = output.transpose(1, 2).contiguous().view(batch_size, -1, self.d_model)
-        output = self.fc(output)
-        return output
-
-class MLP(nn.Module):
-    def __init__(self):
-        super(MLP, self).__init__()
-        self.mlp = nn.Sequential(
-            nn.Linear(2000, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 512),
-            nn.ReLU(),
-            nn.Linear(512, 24)  # Change output dimension to 24
-        )
-
-    def forward(self, x):
-        batch_size, num_channels, feature_dim = x.shape
-        x = x.reshape(-1, feature_dim)  # Change view to reshape
-        x = self.mlp(x)
-        x = x.view(batch_size, num_channels, -1)  # Retain the 3 dimensions
-        return x
-
-class CNN(nn.Module):
-    def __init__(self):
-        super(CNN, self).__init__()
-        self.cnn = nn.Sequential(
-            nn.Conv1d(24, 24, 3, padding=1),  # Change input and output channels to 24
-            nn.ReLU(),
-            nn.Conv1d(24, 24, 3, padding=1),  # Change input and output channels to 24
-            nn.ReLU(),
-        )
-
-    def forward(self, x):
-        batch_size, num_channels, feature_dim = x.shape
-        x = x.view(batch_size * num_channels, feature_dim, -1)  # Flatten the first 2 dimensions
-        x = self.cnn(x)
-        x = x.view(batch_size, num_channels, -1)
-        return x
-
-class LSTMUnit(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers):
-        super(LSTMUnit, self).__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, bidirectional=True)
-        self.fc = nn.Linear(hidden_size*2, 24)  # Add a FC layer to change output dimension to 24
-
-    def forward(self, x):
-        x, (hn, cn) = self.lstm(x)
-        x = self.fc(hn[-2,:,:] + hn[-1,:,:])  # Apply FC on the summation
-        return x.unsqueeze(2)  # Add an extra dimension for attention
-
-class MAST(nn.Module):
-    def __init__(self):
-        super(MAST, self).__init__()
-        self.mlp = MLP()
-        self.cnn = CNN()
-        self.lstm_unit = LSTMUnit(24, 16, 1)  # Change input size to 24
-        self.transformer_unit16 = MultiheadAttention(24, 16)  # Change d_model to 24
-        self.transformer_unit24 = MultiheadAttention(24, 24)  # Keep d_model as 24
-        self.final_fc = nn.Sequential(
-            nn.Linear(24 * 16, 256),
-            nn.ReLU(),
-            nn.Dropout(),
-            nn.Linear(256, 1),
-        )
-
-    def forward(self, x):
-        batch_size, seq_len, num_channels, feature_dim = x.shape
-        transformer_outputs16 = []
-        transformer_outputs24 = []
-
-        for i in range(seq_len):
-            mlp_outputs = self.mlp(x[:, i, :, :])  # Apply MLP on each time step
-            mlp_outputs = mlp_outputs.view(batch_size, num_channels, -1)
-            cnn_outputs = self.cnn(mlp_outputs)
-            lstm_outputs = self.lstm_unit(cnn_outputs)
-            lstm_outputs = lstm_outputs.view(batch_size, num_channels, -1).permute(0, 2, 1).contiguous()
-
-            channel_outputs = []
-            for j in range(num_channels):
-                outputs16 = self.transformer_unit16(lstm_outputs[:,:,j].unsqueeze(2))
-                channel_outputs.append(outputs16)
-            channel_outputs = torch.cat(channel_outputs, dim=2)  # Concatenate results of all channels
-            transformer_outputs16.append(channel_outputs)
-
-        transformer_outputs16 = torch.stack(transformer_outputs16, dim=1)  # Stack results of all time steps
-        transformer_outputs24 = self.transformer_unit24(transformer_outputs16.view(batch_size, seq_len, -1))
-
-        final_outputs = self.final_fc(transformer_outputs24.view(batch_size, -1))
-
-        return final_outputs
+        return outputs2
