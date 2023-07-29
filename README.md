@@ -20,3 +20,11 @@ Inspired by:
   year={2023}
 }
 ```
+```
+@article{dong2023mesh,
+  title={Mesh-MLP: An all-MLP Architecture for Mesh Classification and Semantic Segmentation},
+  author={Dong, Qiujie and Xu, Rui and Gong, Xiaoran and Wang, Zixiong and Chen, Shuangmin and Xin, Shiqing and Tu, Changhe},
+  journal={arXiv preprint arXiv:2306.05246},
+  year={2023}
+}
+```
