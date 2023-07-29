@@ -58,8 +58,8 @@ df_train, df_test = train_test_split(df, test_size=0.2, stratify=df['label'])
 train_dataset = SequenceDataset(df_train[df.columns.drop(["label"])].values.tolist(), df_train['label'].values)
 test_dataset = SequenceDataset(df_test[df.columns.drop(["label"])].values.tolist(), df_test['label'].values)
 
-train_dataloader = DataLoader(train_dataset, batch_size=2)
-test_dataloader = DataLoader(test_dataset, batch_size=2)
+train_dataloader = DataLoader(train_dataset, batch_size=1)
+test_dataloader = DataLoader(test_dataset, batch_size=1)
 
 loss_function = nn.BCEWithLogitsLoss()
 optimizer = torch.optim.Adam(model.parameters())
@@ -103,7 +103,7 @@ for epoch in range(30):
             val_loss = loss_function(output, labels)
             total_val_loss += val_loss.item()
 
-            probabilities = torch.sigmoid(output).cpu().numpy()
+            probabilities = torch.sigmoid(output).cpu().numpy().flatten()
             predictions = (probabilities > 0.5).astype(int)
             all_labels.extend(labels.cpu().numpy().tolist())
             all_predictions.extend(predictions.tolist())
