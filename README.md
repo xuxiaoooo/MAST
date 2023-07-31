@@ -1,4 +1,4 @@
-Attention-based Multiple Time Series fusion model (MAST), designed for EEG
+## Attention-based Multiple Time Series fusion model (MAST), designed for EEG
 
 ![Image text](https://github.com/xuxiaoooo/MAST/blob/main/draw/MAST.jpg)
 
@@ -28,5 +28,15 @@ Inspired by:
   author={Dong, Qiujie and Xu, Rui and Gong, Xiaoran and Wang, Zixiong and Chen, Shuangmin and Xin, Shiqing and Tu, Changhe},
   journal={arXiv preprint arXiv:2306.05246},
   year={2023}
+}
+```
+```
+@inproceedings{jiang2023elastic,
+  title={Elastic Graph Transformer Networks for EEG-Based Emotion Recognition},
+  author={Jiang, Wei-Bang and Yan, Xu and Zheng, Wei-Long and Lu, Bao-Liang},
+  booktitle={ICASSP 2023-2023 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
+  pages={1--5},
+  year={2023},
+  organization={IEEE}
 }
 ```
