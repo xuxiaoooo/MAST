@@ -1,4 +1,4 @@
-Multiple Attention-based Time Series fusion model (MAST), designed for EEG
+Attention-based Multiple Time Series fusion model (MAST), designed for EEG
 
 ![Image text](https://github.com/xuxiaoooo/MAST/blob/main/draw/MAST.jpg)
 
